@@ -1,0 +1,73 @@
+Research the named physical product for a reference-based Blender model intended
+for use in electromagnetic wave simulation at 20–30 GHz (free-space wavelength
+about 10–15 mm). Use live web search. You must DOWNLOAD the selected reference
+images yourself before returning the structured JSON result. Your working
+directory is the research run directory. Save only image files in $IMAGE_DIR;
+the runner writes evidence.json and checks that every reported image exists.
+Use shell/network tools to fetch actual PNG, JPEG or WebP bytes, not HTML pages.
+If a direct image URL fails, inspect its source page for a usable image or find
+another source, then download and check the replacement. Batch downloads and
+checks in as few shell calls as practical. Never report an image you did not
+successfully save. Name files image_01.jpg/png/webp, image_02.jpg/png/webp,
+etc., in order, and include each relative path as images/image_01.jpg (or its
+actual extension) in the JSON. Record the URL that supplied those bytes in
+`url` and the human-readable source page in `source_url`.
+
+Product: $PRODUCT
+
+Find enough different exterior photographs to establish the overall silhouette,
+3D sections, front/back/top/bottom when those sides matter, material boundaries,
+controls, openings, and assembly state. Prefer manufacturer photos and diagrams;
+use product teardowns, repair manuals, patents, and reputable reviews for hidden
+structure. Select at most TEN images total, with fewer for simple objects.
+Each selected image must have a direct downloadable PNG, JPEG, or WebP URL,
+its source page URL, kind (exterior/interior/dimension), and a short description
+of its viewpoint and the parts it identifies. Give distinct views rather than
+many near-duplicates. Do not guess URLs or cite search-result pages. Keep each
+download below 10 MB; a source thumbnail is fine if its detail is sufficient.
+For products with several functional units, cover each important unit rather
+than spending every image slot on one enclosure.
+
+Decide whether interior images are genuinely useful. For an axe, screwdriver,
+simple wrench, or fully exposed object, infer obvious hidden continuity from
+the exterior and do not spend image slots on a pointless cut-in-half photo.
+For electronics and enclosed assemblies, search for teardown/exploded/cutaway
+evidence that shows positions, proportions and materials of significant parts.
+Seek interior views of each EM-relevant enclosed unit when available, and do
+not use a teardown of one unit as evidence for the unseen internals of another.
+If no credible interior images are available, state that gap. The builder may
+infer a plausible static assembly, but must mark it inferred.
+
+Model the bare product in its normal assembled state unless its name explicitly
+specifies another state. Exclude packaging, hands, accessory carrying cases,
+removable covers, sheaths, detachable accessories and surroundings. Include a
+functional charging enclosure when it is part of the named product. The part
+list must contain
+ONLY required physical regions: no optional or conditional entries. Features
+of one continuous same-material part (for example an axe head and its bevel)
+belong in that part's description, not separate overlapping parts.
+
+Identify a REQUIRED part list for EM geometry: all material regions and parts
+defining the exterior; large or electromagnetically significant interior parts;
+and small parts with special conductive or material effects (for example, a
+metal hinge embedded in plastic). Include structurally essential hidden parts
+when they determine shape or placement. Omit tiny ordinary hardware and
+mechanisms that would not affect response in the 20–30 GHz band. At this band,
+pay attention to material boundaries, openings, seams, conductive pieces and
+internal structures that could change scattering or transmission. Do not use a
+blanket minimum part size: a small metal feature or narrow gap may still matter.
+For each required part, give its material family, location/relationship to other
+parts, why it matters,
+the evidence image IDs or source URLs, and whether its form is observed or
+inferred. Do not invent fine hidden detail. The final list should be sufficient
+to tell a builder exactly what it must include without overloading it.
+
+Find sourced measurements of the WHOLE product: length/width/height/depth or
+overall diameter as appropriate, in millimetres. Keep labels and measurement
+orientation. Do not demand dimensions of every internal component. If credible
+dimensions are unavailable, return no measurements and state the scale gap.
+Use sources that describe this exact model, not a similar revision.
+
+The research result should be compact enough to serve as the builder's first
+input. Preserve uncertainty and distinguish measured, visually estimated and
+inferred statements. Image IDs must be image_01, image_02, ... in array order.
