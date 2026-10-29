@@ -29,6 +29,7 @@ except ImportError:
     bpy = None
 
 MM = .001
+DOMAIN_RADIUS_MM = 150  # assets must fit the 300 mm simulation sphere
 DEFAULT_DIRECTIONS = (
     ('+X', (1, 0, 0)), ('-X', (-1, 0, 0)),
     ('+Y', (0, 1, 0)), ('-Y', (0, -1, 0)),
@@ -360,6 +361,14 @@ def validate(col, scene):
         points.extend(world)
     bounds = [(max(p[i] for p in points) - min(p[i] for p in points)) / MM
               for i in range(3)] if points else [0, 0, 0]
+    radius = 0
+    if points:
+        centre = Vector([(max(p[i] for p in points) + min(p[i] for p in points)) / 2
+                         for i in range(3)])
+        radius = max((p - centre).length for p in points) / MM
+        if radius > DOMAIN_RADIUS_MM:
+            errors.append('exceeds simulation sphere: %.1f mm from bounding-box centre, '
+                          'limit %d mm' % (radius, DOMAIN_RADIUS_MM))
     try:
         targets = json.loads(col['target_bounds_mm'])
         if len(targets) != 3:
@@ -383,7 +392,7 @@ def validate(col, scene):
         if overlaps:
             errors.append('positive-volume overlaps')
     return dict(ok=not errors, errors=errors, overlaps=overlaps,
-                bounds_mm=bounds, parts=parts,
+                bounds_mm=bounds, radius_mm=radius, parts=parts,
                 unchecked=['surface self-intersection', 'material constitutive values',
                            'electromagnetic response', 'functional mechanics'])
 
@@ -729,6 +738,7 @@ def _worker(recipe, out, width, samples):
         report = validate(col, scene)
         result.update(geometry_ok=report['ok'], errors=report['errors'],
                       overlaps=report['overlaps'], bounds_mm=report['bounds_mm'],
+                      radius_mm=report['radius_mm'],
                       parts=len(report['parts']))
     except Exception:
         result['error'] = traceback.format_exc()

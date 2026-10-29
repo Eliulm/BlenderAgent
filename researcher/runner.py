@@ -5,6 +5,7 @@ python researcher/runner.py 'Exact product name' --name output_slug
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 from pathlib import Path
 import re
@@ -50,6 +51,28 @@ SCHEMA={
     'required':['product','complexity','internal_evidence_status','images','parts',
                 'dimensions','notes','gaps'],
 }
+AUDIT_SCHEMA={
+    'type':'object','additionalProperties':False,
+    'properties':{
+        'report':SCHEMA,
+        'needs_research':{'type':'boolean'},
+        'issues':{'type':'array','items':{'type':'string'}},
+    },
+    'required':['report','needs_research','issues'],
+}
+SCREEN_SCHEMA={
+    'type':'object','additionalProperties':False,
+    'properties':{'images':{'type':'array','items':{
+        'type':'object','additionalProperties':False,
+        'properties':{
+            'id':{'type':'string'},'useful':{'type':'boolean'},
+            'kind':{'type':'string','enum':['exterior','interior','dimension','irrelevant']},
+            'observed':{'type':'string'},'reason':{'type':'string'},
+        },
+        'required':['id','useful','kind','observed','reason'],
+    }}},
+    'required':['images'],
+}
 
 
 def _image_type(data):
@@ -68,8 +91,10 @@ def _validate(report):
     if not isinstance(report['parts'],list) or not report['parts']:
         raise ValueError('researcher returned no required parts')
     for item in report['parts']:
-        wording=' '.join((item.get('name',''),item.get('reason',''))).lower()
-        if re.search(r'\boptional\b|include only if|if modeling the|if modelling the',wording):
+        name=item.get('name','').lower()
+        reason=item.get('reason','').lower()
+        if re.search(r'\boptional\b',name) or re.search(
+                r'include only if|if modeling the|if modelling the',reason):
             raise ValueError('required-parts list contains a conditional part: '+item.get('name',''))
     if not any(item.get('kind')=='exterior' for item in images):
         raise ValueError('at least one exterior image is required')
@@ -115,7 +140,70 @@ def _local_images(report,out,previous=None,not_before_ns=None):
     return paths,failures
 
 
-def _call_codex(args,prompt,out,phase,thread=None,images=(),visual=False):
+def _search_queries(out):
+    queries=[]
+    for path in sorted(out.glob('research_turn_*/events.jsonl')):
+        for line in path.read_text().splitlines():
+            try:event=json.loads(line)
+            except json.JSONDecodeError:continue
+            action=event.get('item',{}).get('action',{})
+            if isinstance(action,dict) and action.get('type')=='search':
+                queries.extend(action.get('queries',[]))
+    return list(dict.fromkeys(queries))
+
+
+def _prune_report(report,keep_ids,aliases=None):
+    result=copy.deepcopy(report)
+    aliases=aliases or {}
+    old_ids={item['id'] for item in report['images']}
+    mapping={item['id']:f'image_{index:02d}' for index,item in
+             enumerate((item for item in report['images'] if item['id'] in keep_ids),1)}
+    result['images']=[dict(item,id=mapping[item['id']]) for item in result['images']
+                      if item['id'] in mapping]
+    for part in result['parts']:
+        part['evidence']=list(dict.fromkeys(
+            mapping.get(aliases.get(ref,ref),ref) for ref in part['evidence']
+            if ref not in old_ids or ref in keep_ids or ref in aliases))
+    return result
+
+
+def _deduplicate_urls(report,paths,keep_ids):
+    by_url={}
+    aliases={}
+    for item,path in zip(report['images'],paths):
+        if item['id'] not in keep_ids:continue
+        url=item['url']
+        if url not in by_url:
+            by_url[url]=(item['id'],path.stat().st_size)
+        elif path.stat().st_size>by_url[url][1]:
+            old_winner=by_url[url][0]
+            for old_id,winner in list(aliases.items()):
+                if winner==old_winner:aliases[old_id]=item['id']
+            aliases[old_winner]=item['id']
+            by_url[url]=(item['id'],path.stat().st_size)
+        else:
+            aliases[item['id']]=by_url[url][0]
+    return {winner for winner,_ in by_url.values()},aliases
+
+
+def _screen_prompt(product):
+    return (
+        'Look only at the ATTACHED images, in image_01, image_02, etc. order. '
+        'The named product is '+product+'. No draft captions are provided: '
+        'describe what the pixels actually show in each image. Classify its '
+        'actual pixels as exterior, interior, dimension, or irrelevant. For each image, '
+        'set useful=false if it is blank, depicts the wrong object, or shows '
+        'the product too small or obscured by a person, packaging, text, or '
+        'scenery to reveal useful modeling geometry. A close-up is useful '
+        'when it clearly shows an important feature. A teardown of a closely '
+        'related model is useful when it shows a plausible assembly analogue, '
+        'even if its exterior differs. Judge each image independently. Return '
+        'exactly one observation per attachment, in order. Do not browse or '
+        'call tools.'
+    )
+
+
+def _call_codex(args,prompt,out,phase,thread=None,images=(),visual=False,schema_path=None):
     path=out/f'research_turn_{phase:02d}'
     path.mkdir()
     (path/'prompt.txt').write_text(prompt)
@@ -124,7 +212,7 @@ def _call_codex(args,prompt,out,phase,thread=None,images=(),visual=False):
           '-c',f'web_search="{"disabled" if visual else "live"}"',
           '-c',f'sandbox_mode="{"read-only" if visual else "workspace-write"}"',
           '-c','approval_policy="never"',
-          '--skip-git-repo-check','--json','--output-schema',str(out/'schema.json'),
+          '--skip-git-repo-check','--json','--output-schema',str(schema_path or out/'schema.json'),
           '-o',str(final)]
     if not visual:base+=['-c','sandbox_workspace_write.network_access=true']
     cmd=([args.codex_bin,'exec',*base,'-C',str(out)] if thread is None else
@@ -161,6 +249,8 @@ def run(args):
     out=(Path(args.output).expanduser().resolve() if args.output else ROOT/'research')/args.name
     out.mkdir(parents=True,exist_ok=args.resume)
     (out/'schema.json').write_text(json.dumps(SCHEMA,indent=2))
+    (out/'audit_schema.json').write_text(json.dumps(AUDIT_SCHEMA,indent=2))
+    (out/'screen_schema.json').write_text(json.dumps(SCREEN_SCHEMA,indent=2))
     report=None
     failures=[]
     usage_records=[]
@@ -169,12 +259,23 @@ def run(args):
     phase=0
     if args.resume:
         turns=sorted(out.glob('research_turn_*'))
-        if not turns or not (turns[-1]/'response.json').is_file():
+        completed=[path for path in turns if (path/'response.json').is_file()]
+        if not completed:
             raise ValueError('no completed research response to resume')
-        report=json.loads((turns[-1]/'response.json').read_text())
-        failures=(out/'download_errors.txt').read_text().splitlines() if (out/'download_errors.txt').is_file() else []
+        last_response=json.loads((completed[-1]/'response.json').read_text())
+        search_responses=[response for path in completed
+                          if (response:=json.loads((path/'response.json').read_text())).get('product')]
+        if not search_responses:
+            raise ValueError('no completed search response to resume')
+        report=search_responses[-1]
+        if 'needs_research' in last_response:
+            failures=(last_response['issues'] or ['visual audit requested more relevant images']) \
+                if last_response['needs_research'] else []
+        else:
+            failures=(out/'download_errors.txt').read_text().splitlines() \
+                if (out/'download_errors.txt').is_file() else []
         phase=max(int(path.name.rsplit('_',1)[-1]) for path in turns)+1
-        for path in turns:
+        for path in completed:
             events=[]
             for line in (path/'events.jsonl').read_text().splitlines():
                 try:events.append(json.loads(line))
@@ -183,7 +284,8 @@ def run(args):
                                        if e.get('type')=='turn.completed'),{}))
             search_calls+=sum(e.get('type')=='item.completed' and
                               e.get('item',{}).get('type')=='web_search' for e in events)
-            search_turns+=1
+            if json.loads((path/'response.json').read_text()).get('product'):
+                search_turns+=1
     images_dir=out/'images'
     images_dir.mkdir(exist_ok=True)
     base_prompt=Template((HERE/'prompt.txt').read_text()).substitute(
@@ -197,7 +299,9 @@ def run(args):
             else:
                 prompt=(
                     base_prompt+'\nRepair the COMPLETE result below. Keep useful sourced '
-                    'research and already valid local images. For missing or corrupt files, '
+                    'research and already valid local images. Address every listed failure. '
+                    'For visual relevance or coverage failures, search again and replace '
+                    'weak images with useful evidence. For missing or corrupt files, '
                     'download replacements yourself into the image directory before returning. '
                     'If a host blocks downloads, use a source-page image, thumbnail or a '
                     'different host. A changed URL must have a newly written local image. '
@@ -216,37 +320,114 @@ def run(args):
             continue
         downloaded,failures=_local_images(report,out,previous_report,started_ns)
         if not failures:
-            audit_images=downscale_images(downloaded,out/'audit_images',args.image_max_side)
+            screen_images=downscale_images(downloaded,out/'screen_images',args.image_max_side)
+            _,screen,screen_usage,_=_call_codex(
+                args,_screen_prompt(report['product']),out,phase,
+                images=screen_images,visual=True,
+                schema_path=out/'screen_schema.json')
+            usage_records.append(screen_usage)
+            phase+=1
+            observations=screen['images']
+            if [item['id'] for item in observations]!=[item['id'] for item in report['images']]:
+                raise ValueError('image screen returned wrong image IDs or order')
+            keep_ids={item['id'] for item in observations
+                      if item['useful'] and item['kind']!='irrelevant'}
+            keep_ids,aliases=_deduplicate_urls(report,downloaded,keep_ids)
+            draft=_prune_report(report,keep_ids,aliases)
+            observation_by_id={item['id']:item for item in observations}
+            old_id_by_path={item['path']:item['id'] for item in report['images']}
+            for item in draft['images']:
+                observed=observation_by_id[old_id_by_path[item['path']]]
+                item['kind']=observed['kind']
+                item['description']=observed['observed']
+            if not draft['images'] or not any(item['kind']=='exterior' for item in draft['images']):
+                failures=['image screen found no useful full-product exterior view: '+
+                          '; '.join(item['id']+' '+item['reason'] for item in observations
+                                    if not item['useful'])]
+                (out/'download_errors.txt').write_text('\n'.join(failures)+'\n')
+                continue
+            kept_paths=[path for item,path in zip(report['images'],downloaded)
+                        if item['id'] in keep_ids]
+            audit_images=downscale_images(kept_paths,out/'audit_images',args.image_max_side)
             audit_prompt=(
                 'Visually audit the ATTACHED downloaded images in their image_01, image_02, '
                 'etc. order. Attachments are bounded-size copies of the saved originals. '
-                'Here is the draft research evidence:\n'+json.dumps(report,indent=2)+
-                '\nReturn a corrected COMPLETE JSON result using the same schema. Inspect '
-                'the actual pixels, correct every view description and part inference, and '
-                'do not cite an image for internals it does not show. '
-                'distinguish a removable accessory from the bare product. The parts array '
+                'Here are the searches actually performed:\n'+
+                json.dumps(_search_queries(out)[-40:])+
+                '\nAn image-only screen, performed without seeing draft captions, observed:\n'+
+                json.dumps(observations)+
+                '\nHere is the draft research evidence after removing images that the '
+                'screen found unusable:\n'+json.dumps(draft,indent=2)+
+                '\nReturn an audit object with report, needs_research, and issues. Inspect '
+                'EVERY image\'s actual pixels. An image must reveal a useful shape, surface, '
+                'material boundary, scale, or assembly relationship of the named product. '
+                'Reject images dominated by a person, unrelated object, package, text, '
+                'or scenery when the target is too small or obscured to model from. Reject '
+                'near-duplicate views that add no geometry. Do not rescue an irrelevant '
+                'photo by writing a favorable description. Correct every view description '
+                'and part inference; do not cite an image for internals it does not show. '
+                'The draft image kinds and descriptions now come from an image-only '
+                'screen; preserve those observed facts. Keep each image path and URL '
+                'together. If the pixels clearly conflict with their claimed source '
+                'or model, set needs_research=true and request a corrected mapping. '
+                'For a complex enclosed assembly, use the actual search queries to judge '
+                'whether exact-model and related-model internals were sought. Retain a '
+                'useful related-model teardown as a labeled visual analogue, even if its '
+                'exterior differs; never treat it as proof of exact unseen geometry. '
+                'Set needs_research=true only when no usable full-object exterior view '
+                'remains, most selected images are irrelevant, or a complex enclosed '
+                'assembly has no useful internal view and the search stopped at the '
+                'exact model without trying closely related models. Do not request more research '
+                'merely for missing rear/underside angles, exact dimensions, or an exact '
+                'teardown after reasonable searches; record those limitations as gaps. '
+                'A missing interior image is acceptable when exact and related-model '
+                'searches were tried without a useful result. When needs_research=true, keep '
+                'the original image IDs, URLs, and paths in report so the search turn '
+                'can replace them. When needs_research=false, discard unhelpful images '
+                'and renumber retained IDs consecutively. '
+                'Keep necessary batteries, motors, coils and circuits in the required '
+                'parts list for enclosed electric products even when no teardown '
+                'images are available; mark unsupported shapes inferred. The part '
+                'list must be structurally complete (no major part missing that holds '
+                'the assembly together; no screws or minor hardware) and include every '
+                'exterior part plus electromagnetically relevant internals. Parts fully '
+                'enclosed by a closed conductive shell without significant openings '
+                'are EM-invisible; remove them unless structurally needed. '
+                'Prefer retaining images that add a new viewpoint. '
+                'Distinguish an optional removable accessory from an installed '
+                'replaceable component essential to normal use. The parts array '
                 'must contain only required physical regions of the bare product; merge '
-                'same-material continuous features. Correct unsupported dimensional claims '
+                'same-material continuous features, but keep distinct major internal '
+                'components and material regions as separate requirements. '
+                'Correct unsupported dimensional claims '
                 'rather than inventing values. Preserve measurements cited to a source page '
                 'for this exact model; a product dimension need not be visible in a photo. '
                 'Remove a dimension only when its source/model or value is unsupported. '
-                'Keep only downloaded image URLs already in '
-                'the draft; you may discard an unhelpful image and renumber kept image IDs '
-                'consecutively. Do not browse or call tools.'
+                'Keep only downloaded image paths and URLs already in the draft. Do not browse '
+                'or call tools.'
             )
-            _,audited,visual_usage,_=_call_codex(
+            _,audit,visual_usage,_=_call_codex(
                 args,audit_prompt,out,phase,
-                images=audit_images,visual=True)
+                images=audit_images,visual=True,schema_path=out/'audit_schema.json')
             usage_records.append(visual_usage)
+            phase+=1
+            audited=audit['report']
+            if audit['needs_research']:
+                failures=audit['issues'] or ['visual audit requested more relevant images']
+                (out/'download_errors.txt').write_text('\n'.join(failures)+'\n')
+                continue
             _validate(audited)
-            source_by_url={item['url']:out/item['path'] for item in report['images']}
-            if any(item['url'] not in source_by_url for item in audited['images']):
-                raise ValueError('visual audit introduced a new unverified image URL')
+            source_by_path={item['path']:out/item['path'] for item in report['images']
+                            if item['id'] in keep_ids}
+            allowed_pairs={(item['path'],item['url']) for item in draft['images']}
+            if any((item['path'],item['url']) not in allowed_pairs
+                   for item in audited['images']):
+                raise ValueError('visual audit changed a downloaded image path or URL')
             selected=out/'selected_images'
             selected.mkdir(exist_ok=True)
             for stale in selected.iterdir():stale.unlink()
             for item in audited['images']:
-                source=source_by_url[item['url']]
+                source=source_by_path[item['path']]
                 dest=selected/(item['id']+source.suffix)
                 shutil.copy2(source,dest)
                 item['path']=str((Path('images')/dest.name))
@@ -258,6 +439,9 @@ def run(args):
             if not args.keep_audit:
                 for path in out.glob('research_turn_*'):shutil.rmtree(path)
                 (out/'schema.json').unlink()
+                (out/'audit_schema.json').unlink()
+                (out/'screen_schema.json').unlink()
+                shutil.rmtree(out/'screen_images')
                 shutil.rmtree(out/'audit_images')
             fresh=sum(u.get('input_tokens',0)-u.get('cached_input_tokens',0)
                       for u in usage_records)
@@ -269,7 +453,7 @@ def run(args):
                         cached_input_tokens=cached,output_tokens=output)
         (out/'download_errors.txt').write_text('\n'.join(failures)+'\n')
     (out/'download_errors.txt').write_text('\n'.join(failures)+'\n')
-    raise RuntimeError(f'could not download all selected images; inspect {out / "download_errors.txt"}')
+    raise RuntimeError(f'could not assemble relevant visual evidence; inspect {out / "download_errors.txt"}')
 
 
 def main():

@@ -19,16 +19,23 @@ python3 run.py --evidence /absolute/path/evidence.json --name unique_asset
 
 The researcher selects up to ten downloaded reference images, with descriptions
 and source pages, a required part list, whole-product dimensions, and explicit
-evidence gaps. It judges EM-relevant detail for the intended 20–30 GHz band.
+evidence gaps. It judges EM-relevant detail for the intended 0.1–15 GHz band.
+The builder treats the evidence as inspiration: it designs a distinct, realistic
+variant without logos, text or brand names, and the verifier rejects any asset
+that does not fit the 300 mm diameter simulation sphere.
 Luna downloads the selected images itself into the research run's `images/`
 directory; the runner checks the saved files before the visual audit. If a
 download fails, Luna repairs the evidence and keeps useful earlier research.
 Run the same command with `--resume` after an interrupted research step.
-Simple exposed objects need fewer views and usually no teardown.
-Enclosed electronics generally need interior evidence when it exists. Review or
-edit `research/<name>/evidence.json` before building if source quality matters.
-After downloading, Luna sees the actual images once to correct viewpoint labels,
-exclude detachable accessories, and check part and dimension claims.
+Simple exposed objects need fewer views and usually no teardown. For complex
+enclosures, Luna searches for exact-model internals and then useful related-model
+teardowns if needed. Related-model pictures are labeled as visual analogues;
+an internal picture is not mandatory when no useful one can be found.
+An image-only screen rejects blank or irrelevant downloads before a separate
+evidence audit corrects viewpoint labels, parts, and dimensions. The audit can
+request a targeted new search for poor coverage without forcing one merely
+because an exact teardown or measurement is unavailable. Review or edit
+`research/<name>/evidence.json` before building if source quality matters.
 
 For manually supplied references, image paths in `evidence.json` are relative to
 that file. A minimal record is:

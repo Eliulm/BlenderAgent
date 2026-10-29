@@ -37,7 +37,8 @@ FOLLOWUP = """Verification attempt {number} is finished. Result: {result}
 Before choosing code, think through two independent reviews internally:
 1. Verification: diagnose each error and choose the specific source changes
    that would repair it.
-2. Visual: compare the render with the original reference attachments. First
+2. Visual: compare the render with the original reference attachments,
+   allowing only for the deliberate variations in your assumptions. First
    assess the overall silhouette, main proportions, assembly placement and
    large openings in every relevant view; only then inspect smaller surface
    details. Identify the largest concrete mismatch, its reference image/view,
@@ -174,7 +175,7 @@ def _apply(response,recipe,first,prior_ok):
 
 def _compact(result):
     keys=('ok','geometry_ok','preview','preview_status','preview_error','preview_warnings',
-          'preview_panels','errors','bounds_mm','parts','error')
+          'preview_panels','errors','bounds_mm','radius_mm','parts','error')
     out={k:result[k] for k in keys if k in result}
     overlap=result.get('overlaps',[])
     if overlap:
@@ -386,7 +387,7 @@ def main():
     parser.add_argument('--name',required=True)
     parser.add_argument('--output',help='Parent output directory; default BlenderAgent/output')
     parser.add_argument('--model',default='gpt-6-astra')
-    parser.add_argument('--effort',choices=('low','medium','high'),default='low')
+    parser.add_argument('--effort',choices=('low','medium','high','xhigh'),default='low')
     parser.add_argument('--width',type=int,default=1440)
     parser.add_argument('--reference-max-side',type=int,default=1260,
                         help='Maximum long side of each reference image attached to Astra')

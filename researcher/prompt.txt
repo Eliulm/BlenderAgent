@@ -1,6 +1,12 @@
-Research the named physical product for a reference-based Blender model intended
-for use in electromagnetic wave simulation at 20–30 GHz (free-space wavelength
-about 10–15 mm). Use live web search. You must DOWNLOAD the selected reference
+Research the named physical product as the real-world inspiration for a Blender
+model intended for electromagnetic wave simulation from 0.1 to 15 GHz (free-space
+wavelength about 3 m down to 20 mm). The builder will create a new, closely
+inspired but distinct object of the same kind, not a replica, so your job is to
+establish how this product really looks, is assembled and works: shape,
+proportions, major parts, materials and their arrangement. Logos, printed or
+embossed text, brand marks and decorative graphics are not wanted; never list
+them as parts or features. Every asset must fit inside a 300 mm diameter
+sphere (the simulation domain). Use live web search. You must DOWNLOAD the selected reference
 images yourself before returning the structured JSON result. Your working
 directory is the research run directory. Save only image files in $IMAGE_DIR;
 the runner writes evidence.json and checks that every reported image exists.
@@ -17,8 +23,26 @@ Product: $PRODUCT
 
 Find enough different exterior photographs to establish the overall silhouette,
 3D sections, front/back/top/bottom when those sides matter, material boundaries,
-controls, openings, and assembly state. Prefer manufacturer photos and diagrams;
-use product teardowns, repair manuals, patents, and reputable reviews for hidden
+controls, openings, and assembly state. Viewpoint diversity is the single most
+useful property of the image set: the builder reconstructs 3D shape from these
+photos, and each genuinely new angle improves its result. For any object with a
+non-trivial 3D shape, actively seek both canonical views (front, back, left,
+right, top, bottom) and off-axis views (three-quarter views from above and
+below, oblique front and rear corners), and prefer a new viewpoint over a
+second photo from an angle already covered. Product galleries, 360-degree
+spins, review photo sets and listing images are good sources of many angles.
+Note each image's approximate viewpoint in its description. A simple,
+symmetric or flat object needs only a few views; do not pad the set.
+Prefer manufacturer photos and diagrams; prefer unobstructed photos of
+the unpackaged object over retail packaging and advertising graphics.
+Include a package image only when it is the best available
+evidence for a required view or feature. A scene dominated by people, props,
+text, or packaging is not useful merely because the object appears in it.
+Require at least one full-length, unobstructed product view when such a photo
+exists. Omit images in which the product is absent, tiny, heavily cropped, or
+visible only as package artwork; do not fill the ten-image allowance for its
+own sake.
+Use product teardowns, repair manuals, patents, and reputable reviews for hidden
 structure. Select at most TEN images total, with fewer for simple objects.
 Each selected image must have a direct downloadable PNG, JPEG, or WebP URL,
 its source page URL, kind (exterior/interior/dimension), and a short description
@@ -33,40 +57,92 @@ simple wrench, or fully exposed object, infer obvious hidden continuity from
 the exterior and do not spend image slots on a pointless cut-in-half photo.
 For electronics and enclosed assemblies, search for teardown/exploded/cutaway
 evidence that shows positions, proportions and materials of significant parts.
-Seek interior views of each EM-relevant enclosed unit when available, and do
-not use a teardown of one unit as evidence for the unseen internals of another.
-If no credible interior images are available, state that gap. The builder may
-infer a plausible static assembly, but must mark it inferred.
+Make a deliberate internal-evidence search, separate from the exterior search:
+try the exact model and identifier with teardown, disassembly, internal, repair,
+and exploded-view terms. If that fails, search closely related models in the
+same product family and inspect whether their assemblies are genuinely useful
+as visual analogues. Include a related-model image when it explains likely part
+shapes or placement, but label its model and differences in the description;
+never claim it depicts the exact target's unseen internals. Seek interior views
+of each EM-relevant enclosed unit where available. Mark any target-specific
+shape inferred when supported only by an analogue. If neither exact nor useful
+related-model interior images can be found after this search, state that gap;
+the builder may infer a plausible static assembly. The absence of an interior
+image is acceptable when the evidence truly is unavailable. In that case, or
+when interior evidence is partial, add a short note explaining how this kind of
+product works and how its major internal parts are typically arranged
+(positions, rough sizes, materials), from your engineering knowledge, marked
+inferred, so the builder can reconstruct a plausible interior.
+Once a useful related-model teardown is found, keep it rather than discarding
+all interior images while pursuing an exact-model source that may not exist.
 
-Model the bare product in its normal assembled state unless its name explicitly
-specifies another state. Exclude packaging, hands, accessory carrying cases,
-removable covers, sheaths, detachable accessories and surroundings. Include a
-functional charging enclosure when it is part of the named product. The part
+Model the product in its normal assembled, usable state unless its name
+explicitly specifies another state. Include a standard installed replaceable
+component essential to ordinary use.
+Exclude packaging, hands, accessory carrying cases, spare replacement parts,
+removable protective covers, sheaths, optional attachments and surroundings.
+Include a functional charging enclosure when it is part of the named product. The part
 list must contain
 ONLY required physical regions: no optional or conditional entries. Features
 of one continuous same-material part (for example an axe head and its bevel)
 belong in that part's description, not separate overlapping parts.
 
-Identify a REQUIRED part list for EM geometry: all material regions and parts
-defining the exterior; large or electromagnetically significant interior parts;
-and small parts with special conductive or material effects (for example, a
-metal hinge embedded in plastic). Include structurally essential hidden parts
-when they determine shape or placement. Omit tiny ordinary hardware and
-mechanisms that would not affect response in the 20–30 GHz band. At this band,
-pay attention to material boundaries, openings, seams, conductive pieces and
-internal structures that could change scattering or transmission. Do not use a
-blanket minimum part size: a small metal feature or narrow gap may still matter.
+THE REQUIRED PART LIST IS THE MOST IMPORTANT OUTPUT. It decides which physical
+parts exist in the final asset; the builder models exactly this list, so a
+missing part is missing from the dataset and an unnecessary one wastes effort.
+There is no fixed recipe: we rely on your engineering judgment, informed by
+everything you found and your own knowledge, to decide what matters for this
+object. First understand the product: how it is built, how it works, which
+parts hold it together and where its conductive and dielectric material sits.
+Then select parts by two criteria:
+
+1. Structural completeness. Include every major part that makes the object
+   physically hold together and function as an assembly: housings and shells,
+   frames, chassis, handles, heads, lids, hinges, axles, large brackets and
+   main internal carriers. If the listed parts were built for real, the
+   object should not unexplained gaps. Bigger generally means more important.
+   Do not list screws, clips, washers, small springs, cable ties,
+   adhesive or similar minor hardware.
+2. Electromagnetic relevance in 0.1–15 GHz. Include every exterior part and
+   material region, since what is visible from outside dominates scattering.
+   Inside, include parts that change the response even if they are small or
+   structurally minor: conductive bodies and their continuous lengths (boards,
+   coils and windings, cells, motors, wires and cable runs, shields, heat
+   sinks, metal frames), large dielectric volumes, and apertures or slots of
+   several millimetres or more. Weigh each part against its surroundings: a
+   small metal hinge in otherwise plastic glasses matters a lot, while one more
+   small bracket among many metal parts of a graphics card does not. A copper
+   winding inside a mostly plastic object can matter; the same winding inside
+   a large metal assembly may not.
+
+Shielding: parts fully enclosed by a closed, continuous conductive shell
+(a sealed metal housing without significant openings, slots or non-metal
+windows) are electromagnetically invisible from outside; do not list them
+unless they are needed structurally. Model the shell itself, with any real
+openings. When a metal enclosure has substantial openings, plastic panels or
+gaps, the internals behind them matter again.
+
+Do not use a blanket minimum part size: a small conductive feature isolated in
+dielectric may still matter, while a large but shielded part may not.
 For each required part, give its material family, location/relationship to other
-parts, why it matters,
+parts, why it matters (structural, electromagnetic, or both),
 the evidence image IDs or source URLs, and whether its form is observed or
 inferred. Do not invent fine hidden detail. The final list should be sufficient
 to tell a builder exactly what it must include without overloading it.
+Keep distinct material regions and major hidden components in distinct list
+entries. Do not collapse a cell, actuator, conductive winding, circuit board,
+and support frame into one generic "internals" requirement when those parts
+are all relevant.
 
 Find sourced measurements of the WHOLE product: length/width/height/depth or
 overall diameter as appropriate, in millimetres. Keep labels and measurement
 orientation. Do not demand dimensions of every internal component. If credible
 dimensions are unavailable, return no measurements and state the scale gap.
 Use sources that describe this exact model, not a similar revision.
+After a few credible searches with no exact-model dimensions, record a scale
+gap and move on; do not let dimension hunting displace useful images.
+If the product's real size would not fit a 300 mm diameter sphere, say so in
+gaps; do not alter sourced values.
 
 The research result should be compact enough to serve as the builder's first
 input. Preserve uncertainty and distinguish measured, visually estimated and

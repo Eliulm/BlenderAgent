@@ -23,12 +23,37 @@ optional=dict(base,parts=[dict(base['parts'][0],name='optional sheath')])
 try:research._validate(optional)
 except ValueError as exc:assert 'conditional part' in str(exc)
 else:raise AssertionError('optional part accepted as required')
+installed=dict(base,parts=[dict(base['parts'][0],name='installed brush head',
+                                reason='required for use, not an optional accessory')])
+research._validate(installed)
+complex_without_photo=dict(base,complexity='complex',internal_evidence_status='unavailable')
+research._validate(complex_without_photo)
+conditional=dict(base,parts=[dict(base['parts'][0],reason='include only if exposed')])
+try:research._validate(conditional)
+except ValueError as exc:assert 'conditional part' in str(exc)
+else:raise AssertionError('conditional reason accepted as required')
+
+two_images=dict(base,images=base['images']+[dict(base['images'][0],
+    id='image_02',url='https://example.com/detail.jpg',path='images/image_02.jpg')],
+    parts=[dict(base['parts'][0],evidence=['image_01','image_02'])])
+pruned=research._prune_report(two_images,{'image_02'})
+assert [item['id'] for item in pruned['images']]==['image_01']
+assert pruned['parts'][0]['evidence']==['image_01']
+assert two_images['parts'][0]['evidence']==['image_01','image_02']
 
 with TemporaryDirectory(prefix='blenderagent_research_') as temp:
     out=Path(temp)
     (out/'images').mkdir()
     image=out/'images/image_01.jpg'
     image.write_bytes(b'\xff\xd8\xff'+b'x'*40)
+    second=out/'images/image_02.jpg'
+    second.write_bytes(b'\xff\xd8\xff'+b'x'*80)
+    duplicated=dict(two_images,images=[dict(two_images['images'][0]),
+        dict(two_images['images'][1],url=two_images['images'][0]['url'])])
+    kept,aliases=research._deduplicate_urls(duplicated,[image,second],
+                                             {'image_01','image_02'})
+    assert kept=={'image_02'} and aliases=={'image_01':'image_02'}
+    assert research._prune_report(duplicated,kept,aliases)['parts'][0]['evidence']==['image_01']
     paths,failures=research._local_images(base,out)
     assert paths==[image.resolve()] and not failures
     changed=dict(base,images=[dict(base['images'][0],url='https://example.com/new.jpg')])
