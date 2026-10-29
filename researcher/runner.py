@@ -108,6 +108,32 @@ def _validate(report):
             raise ValueError('dimensions need positive mm values and source URLs')
 
 
+def _repair_audit(audited,draft):
+    """Restore each audited image's draft path/URL pair and renumber IDs consecutively.
+
+    The audit only selects and re-describes already downloaded images, and files are
+    re-copied under their final IDs afterwards, so these slips need no new research turn.
+    """
+    result=copy.deepcopy(audited)
+    url_by_path={item['path']:item['url'] for item in draft['images']}
+    path_by_url={item['url']:item['path'] for item in draft['images']}
+    images=[]
+    for item in result['images']:
+        if item.get('path') in url_by_path:item['url']=url_by_path[item['path']]
+        elif item.get('url') in path_by_url:item['path']=path_by_url[item['url']]
+        else:continue
+        if all(item['path']!=kept['path'] for kept in images):images.append(item)
+    mapping={}
+    for index,item in enumerate(images,1):
+        mapping.setdefault(item.get('id'),f'image_{index:02d}')
+        item['id']=f'image_{index:02d}'
+    result['images']=images
+    for part in result['parts']:
+        part['evidence']=list(dict.fromkeys(mapping.get(ref,ref) for ref in part['evidence']
+                                            if not re.fullmatch(r'image_\d+',ref) or ref in mapping))
+    return result
+
+
 def _local_images(report,out,previous=None,not_before_ns=None):
     """Check Luna's files; never trust a path or an image URL without local bytes."""
     prior={item['id']:(item['url'],item['path']) for item in previous['images']} if previous else {}
@@ -416,6 +442,7 @@ def run(args):
                 failures=audit['issues'] or ['visual audit requested more relevant images']
                 (out/'download_errors.txt').write_text('\n'.join(failures)+'\n')
                 continue
+            audited=_repair_audit(audited,draft)
             _validate(audited)
             source_by_path={item['path']:out/item['path'] for item in report['images']
                             if item['id'] in keep_ids}

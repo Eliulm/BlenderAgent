@@ -1,4 +1,4 @@
-"""Research a product with Luna, then build it with Astra and Blender.
+"""Research a product with Luna, then build it with Sol and Blender.
 
 python run.py --product 'Exact product name' --name product_slug
 python run.py --evidence /path/to/evidence.json --name product_slug
@@ -6,6 +6,7 @@ python run.py --evidence /path/to/evidence.json --name product_slug
 from __future__ import annotations
 
 import argparse
+import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -19,31 +20,43 @@ def main():
     target.add_argument('--product',help='Exact product name to research with GPT-6 Luna')
     target.add_argument('--evidence',type=Path,help='Existing researched evidence.json')
     parser.add_argument('--name',required=True,help='Unique output directory name')
-    parser.add_argument('--effort',choices=('low','medium','high'),default='low')
+    parser.add_argument('--effort',choices=('low','medium','high','xhigh'),default='low')
+    parser.add_argument('--model',default='gpt-6.1-sol',help='Builder model')
+    parser.add_argument('--root',type=Path,default=ROOT,
+                        help='Directory holding research/ and output/; default this repository')
     parser.add_argument('--preview-width',type=int,default=1440,
                         help='Contact-sheet width in pixels; default 1440 (use 2100 for full size)')
     parser.add_argument('--reference-max-side',type=int,default=1260,
-                        help='Longest side of images attached to Luna and Astra; default 1260')
+                        help='Longest side of images attached to Luna and Sol; default 1260')
     parser.add_argument('--keep-work',action='store_true',help='Keep builder prompts and attempts')
     parser.add_argument('--keep-research-audit',action='store_true')
     parser.add_argument('--resume',action='store_true',help='Resume a checkpointed builder run')
+    parser.add_argument('--research-only',action='store_true',help='Stop after writing evidence.json')
     args=parser.parse_args()
     if args.product:
-        evidence=ROOT/'research'/args.name/'evidence.json'
+        evidence=args.root/'research'/args.name/'evidence.json'
         if not evidence.is_file():
-            cmd=[sys.executable,str(ROOT/'researcher'/'runner.py'),args.product,'--name',args.name]
+            cmd=[sys.executable,str(ROOT/'researcher'/'runner.py'),args.product,'--name',args.name,
+                 '--output',str(args.root/'research')]
             cmd+=['--image-max-side',str(args.reference_max_side)]
             if args.keep_research_audit:cmd.append('--keep-audit')
-            if args.resume:cmd.append('--resume')
+            research=args.root/'research'/args.name
+            if any(research.glob('research_turn_*/response.json')):
+                if args.resume:cmd.append('--resume')
+            elif research.is_dir():
+                shutil.rmtree(research)  # interrupted before any completed response
             if subprocess.run(cmd,cwd=ROOT,check=False).returncode:
                 return 1
+        if args.research_only:
+            return 0
     else:
         evidence=args.evidence.expanduser().resolve()
     cmd=[sys.executable,str(ROOT/'builder'/'runner.py'),
          '--evidence',str(evidence),'--name',args.name,'--effort',args.effort,
+         '--model',args.model,'--output',str(args.root/'output'),
          '--width',str(args.preview_width),'--reference-max-side',str(args.reference_max_side)]
     if args.keep_work:cmd.append('--keep-work')
-    if args.resume and (ROOT/'output'/args.name/'.work'/'state.json').is_file():
+    if args.resume and (args.root/'output'/args.name/'.work'/'state.json').is_file():
         cmd.append('--resume')
     return subprocess.run(cmd,cwd=ROOT,check=False).returncode
 

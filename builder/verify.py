@@ -671,6 +671,7 @@ def preview(col, path, *, width=1440, samples=16):
     data.ortho_scale = max(sheet_w/(max(p.x for p in frame)-min(p.x for p in frame)),
                            sheet_h/(max(p.y for p in frame)-min(p.y for p in frame)))*1.03
     scene.render.engine = 'CYCLES'
+    _use_gpu(scene)
     scene.cycles.samples = samples
     scene.cycles.use_denoising = True
     scene.render.image_settings.file_format = 'PNG'
@@ -678,6 +679,22 @@ def preview(col, path, *, width=1440, samples=16):
     scene.render.filepath = str(path)
     bpy.ops.render.render(write_still=True, scene=scene.name)
     return scene, warnings, [p[0] for p in prepared]
+
+
+def _use_gpu(scene):
+    """Render on the GPU when BA_CYCLES_DEVICE is OPTIX or CUDA; pick the card with CUDA_VISIBLE_DEVICES."""
+    kind = os.environ.get('BA_CYCLES_DEVICE', '').upper()
+    if kind not in ('OPTIX', 'CUDA'):
+        return
+    prefs = bpy.context.preferences.addons['cycles'].preferences
+    prefs.compute_device_type = kind
+    prefs.get_devices()
+    found = False
+    for device in prefs.devices:
+        device.use = device.type == kind
+        found = found or device.use
+    if found:
+        scene.cycles.device = 'GPU'
 
 
 def _remove_presentation(scene):

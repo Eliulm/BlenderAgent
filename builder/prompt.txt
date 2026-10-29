@@ -138,7 +138,11 @@ Build requirements:
   features, and do not invent fine detail.
 - The whole asset must fit inside a 300 mm diameter sphere (the simulation
   domain); the verifier rejects any vertex more than 150 mm from the centre of
-  the asset's bounding box. Choose dimensions inside that limit.
+  the asset's bounding box. Choose dimensions inside that limit. If the real
+  product is too large to fit, scale the whole design down uniformly until it
+  fits with a few millimetres to spare, keep its proportions, set
+  target_bounds_mm to the scaled size, and record the scale factor in
+  scale_basis.
 - Use sourced overall dimensions as scale anchors; your variant may differ from
   them by up to about 15 percent where real products of this kind do. Set
   target_bounds_mm to your variant's intended XYZ size; use None for an unknown

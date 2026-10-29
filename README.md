@@ -2,7 +2,7 @@
 
 One researched physical object becomes a labelled Blender scene and separate
 world-coordinate OBJ meshes for EM meshing. Research runs on GPT-6 Luna; the
-reference reconstruction loop runs on GPT-6 Astra. The builder is deliberately
+reference reconstruction loop runs on GPT-6.1 Sol (override with `--model`). The builder is deliberately
 three files: `builder/prompt.txt`, `builder/verify.py`, and `builder/runner.py`.
 
 ```sh
@@ -63,8 +63,8 @@ surrogate: coarse inferred internal material regions and blind exterior
 recesses, without operating mechanisms. Such an asset does not represent the
 true internal EM response.
 
-Each Astra response contains only a complete Blender recipe, exact code edits,
-or an acceptance signal, plus an `accept_if_verified` choice. Astra thinks
+Each Sol response contains only a complete Blender recipe, exact code edits,
+or an acceptance signal, plus an `accept_if_verified` choice. Sol thinks
 through verifier errors and visual discrepancies internally, then returns a
 single integrated code edit without a written review. The runner applies code
 and waits for the isolated Blender verifier; no model tool calls or polling
@@ -74,7 +74,7 @@ It renders a multi-angle sheet, including interior context and cutaways when
 interior parts are tagged. The model gets that sheet and the compact result,
 then decides whether to repair, refine, or accept. Follow-ups reuse the prior
 thread without resending the full recipe unless an edit fails. From the first
-render, Astra separately diagnoses verifier errors and major visual shape
+render, Sol separately diagnoses verifier errors and major visual shape
 differences, then combines their fixes in one edit. A passing edited candidate
 with `accept_if_verified=true` is published without
 another model turn; the first build always receives visual review. This saves
@@ -85,7 +85,7 @@ objects.
 The contact sheet defaults to 1440 pixels wide, with tighter framing so each
 object is larger without making a many-view sheet excessively tall. The
 original research images
-are retained, while copies attached to Luna for visual audit and to Astra for
+are retained, while copies attached to Luna for visual audit and to Sol for
 building are downscaled to a 1260-pixel maximum side. Use
 `--preview-width 2100` or `--reference-max-side 2100` when small details need
 more resolution.

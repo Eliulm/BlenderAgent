@@ -1,4 +1,4 @@
-"""Run a researched object through code-only Astra -> Blender -> visual feedback.
+"""Run a researched object through code-only Sol -> Blender -> visual feedback.
 
 python builder/runner.py --evidence research/product/evidence.json --name product
 """
@@ -386,11 +386,11 @@ def main():
     parser.add_argument('--evidence',required=True)
     parser.add_argument('--name',required=True)
     parser.add_argument('--output',help='Parent output directory; default BlenderAgent/output')
-    parser.add_argument('--model',default='gpt-6-astra')
+    parser.add_argument('--model',default='gpt-6.1-sol')
     parser.add_argument('--effort',choices=('low','medium','high','xhigh'),default='low')
     parser.add_argument('--width',type=int,default=1440)
     parser.add_argument('--reference-max-side',type=int,default=1260,
-                        help='Maximum long side of each reference image attached to Astra')
+                        help='Maximum long side of each reference image attached to Sol')
     parser.add_argument('--samples',type=int,default=16)
     parser.add_argument('--blender-timeout',type=int,default=600)
     parser.add_argument('--model-timeout',type=int,default=3600)
